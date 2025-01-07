@@ -1,7 +1,7 @@
 using AdventOfCode2018.CSharp.Utils;
 using FluentAssertions;
 using Parser;
-
+using Utils;
 using P = Parser.ParserBuiltins;
 
 namespace AdventOfCode2018.CSharp;
@@ -17,9 +17,9 @@ public class Day20
         // var data = Convert(AoCLoader.LoadFile(path));
         var data = Convert(regex);
 
-        var points = data.DistancesToPoints(Point.Zero, 0);
-        points.GroupBy(it => it.Item1, it => it.Item2).MaxBy(it => it.Min())!.Min()
-            .Should().Be(expected);
+        // var points = data.DistancesToPoints(Point.Zero, 0);
+        // points.GroupBy(it => it.Item1, it => it.Item2).MaxBy(it => it.Min())!.Min()
+            data.Furthest.Should().Be(expected);
     }
 
     [Theory]
@@ -39,13 +39,15 @@ public class Day20
     {
         var data = Convert(AoCLoader.LoadFile(path));
 
-        var points = data.DistancesToPoints(Point.Zero, 0);
-        points.GroupBy(it => it.Item1, it => it.Item2).MaxBy(it => it.Min())!.Min()
-            .Should().Be(expected);
+        // var points = data.DistancesToPoints(Point.Zero, 0);
+        // points.GroupBy(it => it.Item1, it => it.Item2).MaxBy(it => it.Min())!.Min()
+            data.Furthest.Should().Be(expected);
     }
 
     public record PathItem(List<Vector> Start, PathChoice Choices)
     {
+        public long Order = Choices.Order == 0 ? 1 : Choices.Order;
+        public long Furthest = Start.Count + Choices.Furthest;
         public PathItem Then(PathChoice grandChildren) => new([], new PathChoice([new PathJoin([this, new([], grandChildren)])]));
         private readonly Dictionary<(Point, long), HashSet<(Point, long)>> tailCache = [];
         private readonly Dictionary<(Point, long), HashSet<(Point, long)>> distancesCache = [];
@@ -92,6 +94,8 @@ public class Day20
 
     public record PathJoin(List<PathItem> Parts)
     {
+        public long Furthest = Parts.Sum(it => it.Furthest);
+        public long Order = Parts.Select(part => part.Order).Product();
         private readonly Dictionary<(Point, long), HashSet<(Point, long)>> tailCache = [];
         private readonly Dictionary<(Point, long), HashSet<(Point, long)>> distancesCache = [];
         public HashSet<(Point, long)> DistancesToPoints(Point zero, long initial) 
@@ -136,6 +140,8 @@ public class Day20
 
     public record PathChoice(List<PathJoin> Parts)
     {
+        public long Furthest => Parts.Count == 0 ? 0 : Parts.Last().Parts.Count == 0 ? 0 : Parts.Max(part => part.Furthest);
+        public long Order = Parts.Select(part => part.Order).Sum();
         private readonly Dictionary<(Point, long), HashSet<(Point, long)>> tailCache = [];
         private readonly Dictionary<(Point, long), HashSet<(Point, long)>> distancesCache = [];
         public HashSet<(Point, long)> DistancesToPoints(Point zero, long initial) 

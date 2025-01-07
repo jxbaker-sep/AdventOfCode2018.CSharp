@@ -3,6 +3,7 @@ namespace Utils;
 public static class EnumerableExtensions
 {
   public static long Product(this IEnumerable<long> self) => self.Aggregate(1L, (a,b) => a * b);
+  public static int Product(this IEnumerable<int> self) => self.Aggregate(1, (a,b) => a * b);
 
   public static string Join<T>(this IEnumerable<T> objects, string joiner = "") => string.Join(joiner, objects);
 
