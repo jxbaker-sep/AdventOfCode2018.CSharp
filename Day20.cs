@@ -51,7 +51,7 @@ public class Day20
         private readonly Dictionary<(Point, long), HashSet<(Point, long)>> distancesCache = [];
         public HashSet<(Point, long)> DistancesToPoints(Point zero, long initial) 
         {
-            // if (distancesCache.TryGetValue((zero, initial), out var cached)) return cached;
+            if (distancesCache.TryGetValue((zero, initial), out var cached)) return cached;
             HashSet<(Point, long)> result = [];
             var current = zero;
             var distance = initial;
@@ -71,7 +71,7 @@ public class Day20
 
         public HashSet<(Point, long)> Tails(Point zero, long initial)
         {
-            // if (tailCache.TryGetValue((zero, initial), out var cached)) return cached;
+            if (tailCache.TryGetValue((zero, initial), out var cached)) return cached;
             HashSet<(Point, long)> result = [];
             var current = zero;
             var distance = initial;
@@ -96,7 +96,7 @@ public class Day20
         private readonly Dictionary<(Point, long), HashSet<(Point, long)>> distancesCache = [];
         public HashSet<(Point, long)> DistancesToPoints(Point zero, long initial) 
         {
-            // if (distancesCache.TryGetValue((zero, initial), out var cached)) return cached;
+            if (distancesCache.TryGetValue((zero, initial), out var cached)) return cached;
             HashSet<(Point, long)> result = [];
             List<(Point, long)> open = [];
             open.Add((zero, initial));
@@ -129,6 +129,7 @@ public class Day20
                 }
                 open = nextOpen;
             }
+            tailCache[(zero, initial)] = [..open];
             return [.. open];
         }
     }
