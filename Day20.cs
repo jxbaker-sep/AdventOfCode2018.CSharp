@@ -180,11 +180,12 @@ public class Day20
                 _ => throw new ApplicationException()
             }).Plus();
         var pc = P.Defer<PathChoice>();
-        Parser<PathItem> pwc = P.Sequence(
-            section,
-            pc.Require().Between(P.String("("), P.String(")").Require()).Optional()
-        ).Select(it => new PathItem(it.First, it.Second.Count == 1 ? it.Second[0] : new PathChoice([])));
-        var pj = pwc.Plus().Select(it => new PathJoin(it));
+        Parser<PathItem> pi = 
+            P.Sequence(
+                section,
+                pc.Before(")").Require().After("(").Optional()
+            ).Select(it => new PathItem(it.First, it.Second.Count == 1 ? it.Second[0] : new PathChoice([])));
+        var pj = pi.Plus().Select(it => new PathJoin(it));
         pc.Actual = P.Sequence(
                 pj,
                 pj.After("|").Star(),
