@@ -23,10 +23,14 @@ public class Day20
     }
 
     [Theory]
-    [InlineData("^W(E|)(W|)$")]
-    public void ParseTest(string regex)
+    [InlineData("^W(E)$", 1)]
+    [InlineData("^W(E|)$", 2)]
+    [InlineData("^W(E|)(W|)$", 4)]
+    public void ParseTest(string regex, int expected)
     {
-        Convert(regex);
+        var data = Convert(regex);
+        var points = data.Tails(Point.Zero, 0);
+        points.Count.Should().Be(expected);
     }
 
     [Theory]
@@ -40,13 +44,14 @@ public class Day20
             .Should().Be(expected);
     }
 
-    public record PathItem(List<Vector> Start, PathChoice Children)
+    public record PathItem(List<Vector> Start, PathChoice Choices)
     {
+        public PathItem Then(PathChoice grandChildren) => new([], new PathChoice([new PathJoin([this, new([], grandChildren)])]));
         private readonly Dictionary<(Point, long), HashSet<(Point, long)>> tailCache = [];
         private readonly Dictionary<(Point, long), HashSet<(Point, long)>> distancesCache = [];
         public HashSet<(Point, long)> DistancesToPoints(Point zero, long initial) 
         {
-            if (distancesCache.TryGetValue((zero, initial), out var cached)) return cached;
+            // if (distancesCache.TryGetValue((zero, initial), out var cached)) return cached;
             HashSet<(Point, long)> result = [];
             var current = zero;
             var distance = initial;
@@ -56,12 +61,9 @@ public class Day20
                 distance += 1;
                 result.Add((current, distance));
             }
-            foreach(var child in Children.Parts) 
+            foreach(var point in Choices.DistancesToPoints(current, distance)) 
             {
-                foreach(var point in child.DistancesToPoints(current, distance))
-                {
-                    result.Add(point);
-                }
+                result.Add(point);
             }
             distancesCache[(zero, initial)] = result;
             return result;
@@ -69,7 +71,7 @@ public class Day20
 
         public HashSet<(Point, long)> Tails(Point zero, long initial)
         {
-            if (tailCache.TryGetValue((zero, initial), out var cached)) return cached;
+            // if (tailCache.TryGetValue((zero, initial), out var cached)) return cached;
             HashSet<(Point, long)> result = [];
             var current = zero;
             var distance = initial;
@@ -78,12 +80,10 @@ public class Day20
                 current += item;
                 distance += 1;
             }
-            foreach(var child in Children.Parts) 
+            if (Choices.Parts.Count == 0) result.Add((current, distance));
+            foreach(var point in Choices.Tails(current, distance)) 
             {
-                foreach(var point in child.Tails(current, distance))
-                {
-                    result.Add(point);
-                }
+                result.Add(point);
             }
             tailCache[(zero, initial)] = result;
             return result;
@@ -96,7 +96,7 @@ public class Day20
         private readonly Dictionary<(Point, long), HashSet<(Point, long)>> distancesCache = [];
         public HashSet<(Point, long)> DistancesToPoints(Point zero, long initial) 
         {
-            if (distancesCache.TryGetValue((zero, initial), out var cached)) return cached;
+            // if (distancesCache.TryGetValue((zero, initial), out var cached)) return cached;
             HashSet<(Point, long)> result = [];
             List<(Point, long)> open = [];
             open.Add((zero, initial));
@@ -118,9 +118,8 @@ public class Day20
         }
         public HashSet<(Point, long)> Tails(Point zero, long initial)
         {
-            if (tailCache.TryGetValue((zero, initial), out var cached)) return cached;
-            List<(Point, long)> open = [];
-            open.Add((zero, initial));
+            // if (tailCache.TryGetValue((zero, initial), out var cached)) return cached;
+            List<(Point, long)> open = [(zero, initial)];
             foreach(var item in Parts)
             {
                 List<(Point, long)> nextOpen = [];
@@ -140,7 +139,7 @@ public class Day20
         private readonly Dictionary<(Point, long), HashSet<(Point, long)>> distancesCache = [];
         public HashSet<(Point, long)> DistancesToPoints(Point zero, long initial) 
         {
-            if (distancesCache.TryGetValue((zero, initial), out var cached)) return cached;
+            // if (distancesCache.TryGetValue((zero, initial), out var cached)) return cached;
             HashSet<(Point, long)> result = [];
             foreach(var item in Parts)
             {
@@ -154,7 +153,7 @@ public class Day20
         }
         public HashSet<(Point, long)> Tails(Point zero, long initial)
         {
-            if (tailCache.TryGetValue((zero, initial), out var cached)) return cached;
+            // if (tailCache.TryGetValue((zero, initial), out var cached)) return cached;
             HashSet<(Point, long)> result = [];
             foreach(var item in Parts)
             {
@@ -180,11 +179,16 @@ public class Day20
                 _ => throw new ApplicationException()
             }).Plus();
         var pc = P.Defer<PathChoice>();
+        var nested = pc.Before(")").Require().After("(");
         Parser<PathItem> pi = 
             P.Sequence(
                 section,
-                pc.Before(")").Require().After("(").Optional()
-            ).Select(it => new PathItem(it.First, it.Second.Count == 1 ? it.Second[0] : new PathChoice([])));
+                nested.Star()
+            ).Select(it => {
+                var d = new PathItem(it.First, new([]));
+                foreach(var other in it.Second) d = d.Then(other);
+                return d;
+            });
         var pj = pi.Plus().Select(it => new PathJoin(it));
         pc.Actual = P.Sequence(
                 pj,
@@ -195,9 +199,6 @@ public class Day20
                 if (it.Third.Count == 1) pps.Add(new PathJoin([]));
                 return new PathChoice(pps);
             });
-        return pc.Select(it => {
-            Console.WriteLine("foo");
-            return it;
-        }).Before(P.EndOfInput).Parse(data);
+        return pc.Before(P.EndOfInput).Parse(data);
     }
 }
