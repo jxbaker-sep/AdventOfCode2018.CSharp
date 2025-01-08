@@ -12,14 +12,42 @@ public class Day20
     [InlineData("^WNE$", 3)]
     [InlineData("^ENWWW(NEEE|SSE(EE|N))$", 10)]
     [InlineData("^ENNWSWW(NEWS|)SSSEEN(WNSE|)EE(SWEN|)NNN$", 18)]
-    public void Sanity(string regex, int expected)
+    public void Sanity1(string regex, int expected)
     {
-        // var data = Convert(AoCLoader.LoadFile(path));
+        var data = Convert(regex);
+        data.Furthest.Should().Be(expected);
+
+        var points = data.DistancesToPoints(Point.Zero, 0);
+        points.GroupBy(it => it.Item1, it => it.Item2).MaxBy(it => it.Min())!.Min()
+            .Should().Be(expected);
+    }
+
+    // [Theory]
+    // [InlineData("^WNE$", 3)]
+    // [InlineData("^W(E)$", 2)]
+    // public void OrderTest(string regex, long expected)
+    // {
+    //     Convert(regex).Order.Should().Be(expected);
+    // }
+
+    [Theory]
+    [InlineData("^WNE$", 1, 3)]
+    [InlineData("^WNE$", 2, 2)]
+    [InlineData("^WNE$", 3, 1)]
+    [InlineData("^W(E)$", 2, 1)]
+    [InlineData("^W(E|)$", 2, 1)]
+    [InlineData("^W(E|)(S|)$", 2, 3)]
+    // [InlineData("^ENWWW(NEEE|SSE(EE|N))$", 5, 11)]
+    // [InlineData("^ENNWSWW(NEWS|)SSSEEN(WNSE|)EE(SWEN|)NNN$", 10, 13)]
+    public void Sanity2(string regex, int shortest, int expected)
+    {
         var data = Convert(regex);
 
-        // var points = data.DistancesToPoints(Point.Zero, 0);
-        // points.GroupBy(it => it.Item1, it => it.Item2).MaxBy(it => it.Min())!.Min()
-            data.Furthest.Should().Be(expected);
+        var points = data.DistancesToPoints(Point.Zero, 0);
+        points.GroupToDictionary(it => it.Item1, it => it.Item2).Count(it => it.Value.Min() >= shortest )
+            .Should().Be(expected);
+        
+        data.AtLeast(shortest).Should().Be(expected);
     }
 
     [Theory]
@@ -34,7 +62,7 @@ public class Day20
     }
 
     [Theory]
-    [InlineData("day20", 0)]
+    [InlineData("day20", 3810L)]
     public void Part1(string path, int expected)
     {
         var data = Convert(AoCLoader.LoadFile(path));
@@ -48,6 +76,16 @@ public class Day20
     {
         public long Order = Choices.Order == 0 ? 1 : Choices.Order;
         public long Furthest = Start.Count + Choices.Furthest;
+
+        public long AtLeast(int n)
+        {
+            if (n < Start.Count)
+            {
+                return Start.Count - n + Choices.Order;
+            }
+            return Choices.AtLeast(n - Start.Count);
+        }
+
         public PathItem Then(PathChoice grandChildren) => new([], new PathChoice([new PathJoin([this, new([], grandChildren)])]));
         private readonly Dictionary<(Point, long), HashSet<(Point, long)>> tailCache = [];
         private readonly Dictionary<(Point, long), HashSet<(Point, long)>> distancesCache = [];
@@ -92,18 +130,31 @@ public class Day20
         }
     }
 
-    public record PathJoin(List<PathItem> Parts)
+    public record PathJoin(IReadOnlyList<PathItem> Parts)
     {
         public long Furthest = Parts.Sum(it => it.Furthest);
         public long Order = Parts.Select(part => part.Order).Product();
+        internal long AtLeast(int n, int index)
+        {
+            if (index >= Parts.Count) return 0;
+            if (n == 0) return Parts.Skip(index).Select(part => part.Order).Product();
+            var part = Parts[index];
+            long result = 0;
+            foreach(var (_, distance) in part.Tails(Point.Zero, 0))
+            {
+                distance.Should().BeLessThan(int.MaxValue);
+                if (distance >= n) result += (1 + distance - n) * Parts.Skip(index+1).Select(part => part.Order).Product();
+                else result += AtLeast(n-(int)distance, index + 1);
+            }
+            return result;
+        }
         private readonly Dictionary<(Point, long), HashSet<(Point, long)>> tailCache = [];
         private readonly Dictionary<(Point, long), HashSet<(Point, long)>> distancesCache = [];
         public HashSet<(Point, long)> DistancesToPoints(Point zero, long initial) 
         {
             if (distancesCache.TryGetValue((zero, initial), out var cached)) return cached;
             HashSet<(Point, long)> result = [];
-            List<(Point, long)> open = [];
-            open.Add((zero, initial));
+            List<(Point, long)> open = [(zero, initial)];
             foreach(var item in Parts)
             {
                 List<(Point, long)> nextOpen = [];
@@ -140,6 +191,10 @@ public class Day20
 
     public record PathChoice(List<PathJoin> Parts)
     {
+        internal long AtLeast(int n)
+        {
+            return Parts.Select(part => part.AtLeast(n, 0)).Sum();
+        }
         public long Furthest => Parts.Count == 0 ? 0 : Parts.Last().Parts.Count == 0 ? 0 : Parts.Max(part => part.Furthest);
         public long Order = Parts.Select(part => part.Order).Sum();
         private readonly Dictionary<(Point, long), HashSet<(Point, long)>> tailCache = [];
@@ -172,7 +227,9 @@ public class Day20
             tailCache[(zero, initial)] = result;
             return result;
         }
-    }
+
+    
+  }
 
     private static PathChoice Convert(string data)
     {

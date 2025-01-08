@@ -2,7 +2,7 @@ namespace AdventOfCode2018.CSharp.Utils;
 
 public class PriorityQueue<T>
   {
-      private readonly SortedDictionary<long, Queue<T>> Actual = new();
+      private readonly SortedDictionary<long, Queue<T>> Actual = [];
       private readonly Func<T, long> PriorityFunction;
       public int Count { get; private set; }
 
