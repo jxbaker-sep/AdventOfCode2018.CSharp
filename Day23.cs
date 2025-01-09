@@ -63,12 +63,41 @@ public class Day23
   {
     var bots = Convert(AoCLoader.LoadFile(path));
 
-    var nearest = bots.SelectMany(bot => bot.FindClosestToZero()).ToHashSet();
-    var largest = nearest.Max(point => bots.Count(bot => bot.Point.ManhattanDistance(point) <= bot.Radius));
+    var cube = new Cube(new(bots.Min(b => b.Point.X),bots.Min(b => b.Point.Y),bots.Min(b => b.Point.Z)),
+      new(bots.Max(b => b.Point.X),bots.Max(b => b.Point.Y),bots.Max(b => b.Point.Z)));
 
-    var result = nearest.Where(point => bots.Count(bot => bot.Point.ManhattanDistance(point) <= bot.Radius) == largest)
-      .Min(point => point.ManhattanDistance(Point3.Zero));
-    result.Should().Be(expected);
+    var result = Hunter(bots, cube, [(point) => point.X, (point) => point.Y, (point) => point.Z],
+      [(point, value) => point with {X=value},(point, value) => point with {Y=value},(point, value) => point with {Z=value}]);
+
+    Console.WriteLine(result);
+    result.Item1.Little.ManhattanDistance(Point3.Zero).Should().Be(expected);
+  }
+
+  private static (Cube, long) Hunter(List<Bot> bots, Cube cube, List<Func<Point3, long>> getters, List<Func<Point3, long, Point3>> setters)
+  {
+    var getter = getters[0];
+    var setter = setters[0];
+    var a = getter(cube.Little);
+    var b = getter(cube.Big);
+    var mybots = bots.Count(b => b.Overlaps(cube));
+    if (mybots == 0) return (cube, 0);
+    if (a == b) {
+      if (getters.Count == 1) return (cube, mybots);
+      return Hunter(bots, cube, getters[1..], setters[1..]);
+    }
+    var split = (a + b) / 2;
+    var left = cube with {Big = setter(cube.Big, split)};
+    var right = cube with {Little = setter(cube.Little, split + 1)};
+    var huntLeft = Hunter(bots, left, getters, setters);
+    var huntRight = Hunter(bots, right, getters, setters);
+    if (huntLeft.Item2 > huntRight.Item2) return huntLeft;
+    if (huntLeft.Item2 < huntRight.Item2) return huntRight;
+    huntLeft.Item1.Little.Should().Be(huntLeft.Item1.Big);
+    huntRight.Item1.Little.Should().Be(huntRight.Item1.Big);
+    if (huntLeft.Item1.Little.ManhattanDistance(Point3.Zero) < huntRight.Item1.Little.ManhattanDistance(Point3.Zero)) {
+      return huntLeft;
+    }
+    return huntRight;
   }
 
   public record Point3(long X, long Y, long Z)
@@ -81,64 +110,33 @@ public class Day23
     }
   }
 
+  public record Cube(Point3 Little, Point3 Big);
+
   public record Bot(Point3 Point, long Radius)
   {
-    private IEnumerable<Point3> BaseToZero()
+    public bool Overlaps(Cube cube)
     {
-      (Point3, long) x((Point3, long) input) { var moved = Move(Point.X, input.Item2); return (input.Item1 with { X = moved.Item1 }, moved.Item2); }
-      (Point3, long) y((Point3, long) input) { var moved = Move(Point.Y, input.Item2); return (input.Item1 with { Y = moved.Item1 }, moved.Item2); }
-      (Point3, long) z((Point3, long) input) { var moved = Move(Point.Z, input.Item2); return (input.Item1 with { Z = moved.Item1 }, moved.Item2); }
-      yield return Move3(x, y, z);
-      yield return Move3(x, z, y);
-      yield return Move3(y, x, z);
-      yield return Move3(y, z, x);
-      yield return Move3(z, x, y);
-      yield return Move3(z, y, x);
+      var remainder = Move(Point.X, cube.Little.X, cube.Big.X, Radius);
+      if (remainder == null) return false;
+      remainder = Move(Point.Y, cube.Little.Y, cube.Big.Y, (long)remainder);
+      if (remainder == null) return false;
+      remainder = Move(Point.Z, cube.Little.Z, cube.Big.Z, (long)remainder);
+      if (remainder == null) return false;
+      return true;
     }
 
-    private Point3 Move3(Func<(Point3, long), (Point3, long)> a, Func<(Point3, long), (Point3, long)> b, Func<(Point3, long), (Point3, long)> c)
+    public static long? Move(long myPosition, long little, long big, long remainder)
     {
-      var result1 = a((Point3.Zero, Radius));
-      var result2 = b(result1);
-      var result3 = c(result2);
-      return result3.Item1;
-    }
-
-    private static (long, long) Move(long position, long remainder)
-    {
-      var consumed = Math.Min(Math.Abs(position), remainder);
-      var result = position < 0 ? position + consumed : position - consumed;
-      return (result, remainder - consumed);
-    }
-
-    public List<Point3> FindClosestToZero()
-    {
-      if (Point.ManhattanDistance(Point3.Zero) <= Radius) return [Point3.Zero];
-      var bases = BaseToZero().ToHashSet();
-
-      var target = bases.First().ManhattanDistance(Point3.Zero);
-      HashSet<Point3> result = [..bases];
-      HashSet<Point3> closed = [..bases];
-      Queue<Point3> open = [];
-      foreach(var b in bases) open.Enqueue(b);
-      long[] v3 = [-1,0,1];
-      List<(long dx, long dy, long dz)> vectors = v3.SelectMany(dx => v3.SelectMany(dy => v3.Select(dz => (dx,dy,dz)))).Where(it => it != (0,0,0)).ToList();
-      while (open.TryDequeue(out var current))
+      if (little <= myPosition && myPosition <= big) return remainder;
+      if (myPosition < little && little - myPosition <= remainder)
       {
-        foreach (var (dx, dy, dz) in vectors)
-        {
-          var next = new Point3(current.X + dx, current.Y + dy, current.Z + dz);
-          if (next.ManhattanDistance(Point) > Radius) continue;
-          if (closed.Contains(next)) continue;
-          var md = next.ManhattanDistance(Point3.Zero);
-          md.Should().BeGreaterThanOrEqualTo(target);
-          if (md > target) continue;
-          closed.Add(next);
-          open.Enqueue(next);
-          result.Add(next);
-        }
+        return remainder - (little - myPosition);
       }
-      return [..result];
+      if (big < myPosition && myPosition - big <= remainder)
+      {
+        return remainder - (myPosition - big);
+      }
+      return null;
     }
   }
 
