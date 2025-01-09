@@ -60,7 +60,7 @@ public class Day23
   [InlineData("Day23.sample.2", 36)]
   [InlineData("Day23", 123356173)]
   public void Part2_Using_Nearest(string path, int expected)
-  {
+  {    
     var bots = Convert(AoCLoader.LoadFile(path));
 
     var cube = new Cube(new(bots.Min(b => b.Point.X),bots.Min(b => b.Point.Y),bots.Min(b => b.Point.Z)),
@@ -69,35 +69,38 @@ public class Day23
     var result = Hunter(bots, cube, [(point) => point.X, (point) => point.Y, (point) => point.Z],
       [(point, value) => point with {X=value},(point, value) => point with {Y=value},(point, value) => point with {Z=value}]);
 
-    Console.WriteLine(result);
+    // Console.WriteLine(result);
     result.Item1.Little.ManhattanDistance(Point3.Zero).Should().Be(expected);
   }
 
-  private static (Cube, long) Hunter(List<Bot> bots, Cube cube, List<Func<Point3, long>> getters, List<Func<Point3, long, Point3>> setters)
+  private static (Cube, long) Hunter(List<Bot> bots, Cube inputCube, List<Func<Point3, long>> inputGetters, List<Func<Point3, long, Point3>> inputSetters)
   {
-    var getter = getters[0];
-    var setter = setters[0];
-    var a = getter(cube.Little);
-    var b = getter(cube.Big);
-    var mybots = bots.Count(b => b.Overlaps(cube));
-    if (mybots == 0) return (cube, 0);
-    if (a == b) {
-      if (getters.Count == 1) return (cube, mybots);
-      return Hunter(bots, cube, getters[1..], setters[1..]);
+    PriorityQueue<(Cube cube, long order, List<Func<Point3, long>> getters, List<Func<Point3, long, Point3>> setters)> q = new(it => -it.order);
+
+    long NumberOfBots(Cube c) => bots.Count(b => b.Overlaps(c));
+    q.Enqueue((inputCube, NumberOfBots(inputCube), inputGetters, inputSetters));
+
+    while (q.TryDequeue(out var current))
+    {
+      // Console.WriteLine(current.order);
+      var getter = current.getters[0];
+      var setter = current.setters[0];
+      var a = getter(current.cube.Little);
+      var b = getter(current.cube.Big);
+      Console.WriteLine($"{current.cube}, {current.order}, {a}, {b}");
+      if (a == b) {
+        if (current.getters.Count == 1) return (current.cube, current.order);
+        q.Enqueue((current.cube, current.order, current.getters[1..], current.setters[1..]));
+        continue;
+      }
+      a.Should().BeLessThan(b);
+      var split = (a + b) / 2;
+      var left = current.cube with {Big = setter(current.cube.Big, split)};
+      var right = current.cube with {Little = setter(current.cube.Little, split + 1)};
+      q.Enqueue((left, NumberOfBots(left), current.getters, current.setters));
+      q.Enqueue((right, NumberOfBots(right), current.getters, current.setters));
     }
-    var split = (a + b) / 2;
-    var left = cube with {Big = setter(cube.Big, split)};
-    var right = cube with {Little = setter(cube.Little, split + 1)};
-    var huntLeft = Hunter(bots, left, getters, setters);
-    var huntRight = Hunter(bots, right, getters, setters);
-    if (huntLeft.Item2 > huntRight.Item2) return huntLeft;
-    if (huntLeft.Item2 < huntRight.Item2) return huntRight;
-    huntLeft.Item1.Little.Should().Be(huntLeft.Item1.Big);
-    huntRight.Item1.Little.Should().Be(huntRight.Item1.Big);
-    if (huntLeft.Item1.Little.ManhattanDistance(Point3.Zero) < huntRight.Item1.Little.ManhattanDistance(Point3.Zero)) {
-      return huntLeft;
-    }
-    return huntRight;
+    throw new ApplicationException();
   }
 
   public record Point3(long X, long Y, long Z)
