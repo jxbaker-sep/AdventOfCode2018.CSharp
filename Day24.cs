@@ -31,37 +31,35 @@ public class Day24
   {
     // Selection phase
     Dictionary<long, ArmyGroup> idToArmy = armies.ToDictionary(it => it.Id, it => it);
-    Dictionary<long, long> allTargets = [];
+    Dictionary<long, long> selectedTargets = [];
     HashSet<ArmyGroup> selected = [];
     var orderedGroups = armies.OrderByDescending(army => army.EffectivePower).ThenByDescending(army => army.Initiative).ToList();
     foreach(var army in orderedGroups) {
-      var targets = armies.Where(it => it.Side != army.Side).Except(selected).ToList();
-      var targets2 = targets.Where(t => t.Weaknesses.Contains(army.AttackElement)).ToList();
-      if (targets2.Count == 0) {
-        targets2 = targets.Where(t => !t.Immunities.Contains(army.AttackElement)).ToList();
+      var availableTargets = armies.Where(it => it.Side != army.Side).Except(selected).ToList();
+      var preferredTargets = availableTargets.Where(t => t.Weaknesses.Contains(army.AttackElement)).ToList();
+      if (preferredTargets.Count == 0) {
+        preferredTargets = availableTargets.Where(t => !t.Immunities.Contains(army.AttackElement)).ToList();
       }
-      if (targets2.Count == 0) {
-        targets2 = targets.Where(t => t.Immunities.Contains(army.AttackElement)).ToList();
+      if (preferredTargets.Count == 0) {
+        preferredTargets = availableTargets.Where(t => t.Immunities.Contains(army.AttackElement)).ToList();
       }
-      var target = targets2.OrderByDescending(t => t.EffectivePower).ThenByDescending(t => t.Initiative).Take(1).ToList();
+      var target = preferredTargets.OrderByDescending(t => t.EffectivePower).ThenByDescending(t => t.Initiative).Take(1).ToList();
       if (target.Count == 1) {
-        allTargets[army.Id] = target[0].Id;
+        selectedTargets[army.Id] = target[0].Id;
         selected.Add(target[0]);
       }
     }
 
     // Deal damage phase
     foreach(var id in armies.OrderByDescending(it => it.Initiative).Select(it => it.Id)) {
-      if (!idToArmy.TryGetValue(id, out var attacker)) continue;
-      if (!allTargets.TryGetValue(id, out var targetId)) continue;
+      if (!idToArmy.TryGetValue(id, out var attacker)) continue; // group has been destroyed
+      if (!selectedTargets.TryGetValue(id, out var targetId)) continue; // group did not select a target
       var target = idToArmy[targetId];
       var damage = attacker.EffectivePower * (target.Weaknesses.Contains(attacker.AttackElement) ? 2 : 1) * (target.Immunities.Contains(attacker.AttackElement) ? 0 : 1);
-      if (damage == 0) continue;
       var losses = damage / target.HitPointsPerUnit;
       if (losses >= target.Units) idToArmy.Remove(targetId);
       else idToArmy[targetId] = target with {Units = target.Units - losses};
     }
-
     return [.. idToArmy.Values];
   }
 
