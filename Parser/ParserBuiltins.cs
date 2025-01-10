@@ -56,6 +56,13 @@ public static class ParserBuiltins
       .Select(it => (it.First.First, it.First.Second, it.First.Third, it.First.Fourth, it.Second));
   }
 
+  public static Parser<(T1 First, T2 Second, T3 Third, T4 Fourth, T5 Fifth, T6 Sixth)> Sequence<T1, T2, T3, T4, T5, T6>(Parser<T1> p1, Parser<T2> p2, Parser<T3> p3, Parser<T4> p4, Parser<T5> p5, Parser<T6> p6)
+  {
+    return Sequence(p1, p2, p3, p4, p5).Then(p6)
+      .Select(it => (it.First.First, it.First.Second, it.First.Third, it.First.Fourth, it.First.Fifth, it.Second));
+  }
+
+
   public static Parser<string> Choice(params string[] choices)
   {
     return choices.Select(it => String(it)).Aggregate((a, b) => a | b);
@@ -94,6 +101,31 @@ public static class ParserBuiltins
       p2.Before(parts[2].Trim()),
       p3.Before(parts[3].Trim()),
       p4.Before(parts[4].Trim())
+    );
+  }
+
+  public static Parser<(T1 First, T2 Second, T3 Third, T4 Fourth, T5 Fifth)> Format<T1, T2, T3, T4, T5>(string format, Parser<T1> p1, Parser<T2> p2, Parser<T3> p3, Parser<T4> p4, Parser<T5> p5) {
+    var parts = format.Split("{}");
+    if (parts.Length != 6) throw new ApplicationException("Format error");
+    return Sequence(
+      p1.Between(parts[0].Trim(), parts[1].Trim()), 
+      p2.Before(parts[2].Trim()),
+      p3.Before(parts[3].Trim()),
+      p4.Before(parts[4].Trim()),
+      p5.Before(parts[5].Trim())
+    );
+  }
+
+  public static Parser<(T1 First, T2 Second, T3 Third, T4 Fourth, T5 Fifth, T6 Sixth)> Format<T1, T2, T3, T4, T5, T6>(string format, Parser<T1> p1, Parser<T2> p2, Parser<T3> p3, Parser<T4> p4, Parser<T5> p5, Parser<T6> p6) {
+    var parts = format.Split("{}");
+    if (parts.Length != 7) throw new ApplicationException("Format error");
+    return Sequence(
+      p1.Between(parts[0].Trim(), parts[1].Trim()), 
+      p2.Before(parts[2].Trim()),
+      p3.Before(parts[3].Trim()),
+      p4.Before(parts[4].Trim()),
+      p5.Before(parts[5].Trim()),
+      p6.Before(parts[6].Trim())
     );
   }
 }

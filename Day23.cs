@@ -43,10 +43,10 @@ public class Day23
   private static (Cube, long) Hunter(List<Bot> bots, Cube inputCube)
   {
     // Algorithm:
-    //  start with a q of the input cube
-    //  take the cube from the q that has the largest number of overlapping bot ranges.
-    //  if that cube is of size 1, then we've found the target (theoritically there could be closer targets of the same order, but not in this data, haha)
-    //  otherwise, add the 8 sub-cubes of this cube to the q
+    //  start with a queue containing the input cube
+    //  take the cube from the queue that has the largest number of overlapping bot ranges.
+    //  if that cube is of size 1, then we've found the target (theoretically there could be closer targets of the same order, but not in this data, haha)
+    //  otherwise, add the 2/4/8 sub-cubes of this cube to the q
     PriorityQueue<(Cube cube, long order)> q = new(it => -it.order);
 
     long NumberOfBots(Cube c) => bots.Count(b => b.Overlaps(c));
