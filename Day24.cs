@@ -1,9 +1,5 @@
-using System.Numerics;
-using System.Reflection.Metadata.Ecma335;
-using System.Security.AccessControl;
 using AdventOfCode2018.CSharp.Utils;
 using FluentAssertions;
-using Microsoft.Z3;
 using Parser;
 using Utils;
 using P = Parser.ParserBuiltins;
@@ -14,33 +10,32 @@ public class Day24
 {
 
   [Theory]
-  // [InlineData("Day24.Sample", 5216)]
+  [InlineData("Day24.Sample", 5216)]
   [InlineData("Day24", 0)] // 26175 too low
   public void Part1(string path, int expected)
   {
     var armies = Convert(AoCLoader.LoadFile(path));
 
-    foreach(var army in armies.immuneArmy.Concat(armies.infectionArmy)) {
+    foreach(var army in armies) {
       Console.WriteLine($"{army.Id}: weak='{army.Weaknesses.Join(",")}'; immune='{army.Immunities.Join(",")}'");
     }
-    while (armies.immuneArmy.Count > 0 && armies.infectionArmy.Count > 0) {
+    while (armies.Any(army => army.Side == 1) && armies.Any(it => it.Side == 2)) {
       armies = Fight(armies);
     }
 
-    (armies.immuneArmy.Sum(it => it.Units) + armies.infectionArmy.Sum(it => it.Units))
+    armies.Sum(it => it.Units)
       .Should().Be(expected);
   }
 
-  private static (List<ArmyGroup> immuneArmy, List<ArmyGroup> infectionArmy) Fight((List<ArmyGroup> immuneArmy, List<ArmyGroup> infectionArmy) armies)
+  private static List<ArmyGroup> Fight(List<ArmyGroup> armies)
   {
-    var (immuneArmy, infectionArmy) = armies;
     // Selection phase
-    Dictionary<long, ArmyGroup> idToArmy = immuneArmy.Concat(infectionArmy).ToDictionary(it => it.Id, it => it);
+    Dictionary<long, ArmyGroup> idToArmy = armies.ToDictionary(it => it.Id, it => it);
     Dictionary<long, long> allTargets = [];
     HashSet<ArmyGroup> selected = [];
-    var orderedGroups = immuneArmy.Concat(infectionArmy).OrderByDescending(army => army.EffectivePower).ThenByDescending(army => army.Initiative).ToList();
+    var orderedGroups = armies.OrderByDescending(army => army.EffectivePower).ThenByDescending(army => army.Initiative).ToList();
     foreach(var army in orderedGroups) {
-      var targets = immuneArmy.Contains(army) ? infectionArmy.Except(selected).ToList() : immuneArmy.Except(selected).ToList();
+      var targets = armies.Where(it => it.Side != army.Side).Except(selected).ToList();
       var targets2 = targets.Where(t => t.Weaknesses.Contains(army.AttackElement)).ToList();
       if (targets2.Count == 0) {
         targets2 = targets.Where(t => !t.Immunities.Contains(army.AttackElement)).ToList();
@@ -56,7 +51,7 @@ public class Day24
     }
 
     // Deal damage phase
-    foreach(var id in immuneArmy.Concat(infectionArmy).OrderByDescending(it => it.Initiative).Select(it => it.Id)) {
+    foreach(var id in armies.OrderByDescending(it => it.Initiative).Select(it => it.Id)) {
       if (!idToArmy.TryGetValue(id, out var attacker)) continue;
       if (!allTargets.TryGetValue(id, out var targetId)) continue;
       var target = idToArmy[targetId];
@@ -67,19 +62,19 @@ public class Day24
       else idToArmy[targetId] = target with {Units = target.Units - losses};
     }
 
-    return (idToArmy.Values.Where(army => immuneArmy.Select(it => it.Id).Contains(army.Id)).ToList(), 
-      idToArmy.Values.Where(army => infectionArmy.Select(it => it.Id).Contains(army.Id)).ToList());
+    return [.. idToArmy.Values];
   }
 
-  public record ArmyGroup(long Id, long Units, long HitPointsPerUnit, List<string> Immunities, List<string> Weaknesses, 
+  public record ArmyGroup(long Id, long Side, long Units, long HitPointsPerUnit, List<string> Immunities, List<string> Weaknesses, 
     long AttackDamage, string AttackElement, long Initiative)
     {
       public long EffectivePower => Units * AttackDamage;
     }
 
-  private static (List<ArmyGroup> immuneArmy, List<ArmyGroup> infectionArmy) Convert(string data)
+  private static List<ArmyGroup> Convert(string data)
   {
     long id = 1;
+    long side = 1;
     var listOfWords = P.Word.Trim().Plus(",");
     var immunities1 = P.Format("immune to {}; weak to {}", listOfWords, listOfWords) 
       | P.Format("weak to {}; immune to {}", listOfWords, listOfWords).Select(it => (First: it.Second, Second: it.First))
@@ -87,9 +82,9 @@ public class Day24
       | P.Format("weak to {}", listOfWords).Select(it => (First: new List<string>(), Second: it));
     var immunities = P.Format("({})", immunities1.Require()).Optional().Select(it => it.Count == 1 ? it[0] : (First: [], Second: []));
     var group = P.Format("{} units each with {} hit points {} with an attack that does {} {} damage at initiative {}",
-      P.Long, P.Long, immunities, P.Long, P.Word, P.Long).Select(it => new ArmyGroup(id++, it.First, it.Second, it.Third.First, it.Third.Second, it.Fourth, it.Fifth, it.Sixth));
+      P.Long, P.Long, immunities, P.Long, P.Word, P.Long).Select(it => new ArmyGroup(id++, side, it.First, it.Second, it.Third.First, it.Third.Second, it.Fourth, it.Fifth, it.Sixth));
     var army = group.Plus();
-    var complete = P.Format("Immune System: {} Infection: {}", army, army);
-    return complete.Before(P.EndOfInput).Parse(data);
+    var complete = P.Format("Immune System: {} Infection: {}", army.Select(it => {side += 1; return it;}), army);
+    return complete.Before(P.EndOfInput).Select(it => it.First.Concat(it.Second).ToList()).Parse(data);
   }
 }
