@@ -11,24 +11,42 @@ public class Day24
 
   [Theory]
   [InlineData("Day24.Sample", 5216)]
-  [InlineData("Day24", 0)] // 26175 too low
+  [InlineData("Day24", 26277)]
   public void Part1(string path, int expected)
   {
     var armies = Convert(AoCLoader.LoadFile(path));
 
-    foreach(var army in armies) {
-      Console.WriteLine($"{army.Id}: weak='{army.Weaknesses.Join(",")}'; immune='{army.Immunities.Join(",")}'");
-    }
+    FightToTheDeath(armies).Sum(it => it.Units)
+      .Should().Be(expected);
+  }
+
+  [Theory]
+  [InlineData("Day24.Sample", 51)]
+  [InlineData("Day24", 8812)]
+  public void Part2(string path, int expected)
+  {
+    var armies = Convert(AoCLoader.LoadFile(path));
+
+    var found = MiscUtils.BinarySearch(10_000_000, (boost) => {
+      var x = FightToTheDeath(armies, boost);
+      return x.Any(it => it.Side == 1);
+    });
+
+    FightToTheDeath(armies, (long)found!).Sum(it => it.Units)
+      .Should().Be(expected);
+  }
+
+  private static List<ArmyGroup> FightToTheDeath(List<ArmyGroup> armies, long boost = 0) {
+    armies = armies.Select(army => army.Side == 1 ? army with {AttackDamage = army.AttackDamage + boost} : army).ToList();
     while (armies.Any(army => army.Side == 1) && armies.Any(it => it.Side == 2)) {
       armies = Fight(armies);
     }
-
-    armies.Sum(it => it.Units)
-      .Should().Be(expected);
+    return armies;
   }
 
   private static List<ArmyGroup> Fight(List<ArmyGroup> armies)
   {
+    var sanity = armies.Sum(it => it.Units);
     // Selection phase
     Dictionary<long, ArmyGroup> idToArmy = armies.ToDictionary(it => it.Id, it => it);
     Dictionary<long, long> selectedTargets = [];
@@ -39,9 +57,6 @@ public class Day24
       var preferredTargets = availableTargets.Where(t => t.Weaknesses.Contains(army.AttackElement)).ToList();
       if (preferredTargets.Count == 0) {
         preferredTargets = availableTargets.Where(t => !t.Immunities.Contains(army.AttackElement)).ToList();
-      }
-      if (preferredTargets.Count == 0) {
-        preferredTargets = availableTargets.Where(t => t.Immunities.Contains(army.AttackElement)).ToList();
       }
       var target = preferredTargets.OrderByDescending(t => t.EffectivePower).ThenByDescending(t => t.Initiative).Take(1).ToList();
       if (target.Count == 1) {
@@ -60,6 +75,12 @@ public class Day24
       if (losses >= target.Units) idToArmy.Remove(targetId);
       else idToArmy[targetId] = target with {Units = target.Units - losses};
     }
+
+    if (idToArmy.Values.Sum(it => it.Units) == sanity) {
+      // stalemate
+      return [];
+    }
+
     return [.. idToArmy.Values];
   }
 
