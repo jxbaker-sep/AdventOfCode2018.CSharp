@@ -16,38 +16,36 @@ public class Day20
     {
         var data = Convert(regex);
         data.Furthest.Should().Be(expected);
+        data.Ns().Keys.Max().Should().Be(expected);
 
-        var points = data.DistancesToPoints(Point.Zero, 0);
-        points.GroupBy(it => it.Item1, it => it.Item2).MaxBy(it => it.Min())!.Min()
-            .Should().Be(expected);
+        // var points = data.DistancesToPoints(Point.Zero, 0);
+        // points.GroupBy(it => it.Item1, it => it.Item2).MaxBy(it => it.Min())!.Min()
+        //     .Should().Be(expected);
     }
 
-    // [Theory]
-    // [InlineData("^WNE$", 3)]
-    // [InlineData("^W(E)$", 2)]
-    // public void OrderTest(string regex, long expected)
-    // {
-    //     Convert(regex).Order.Should().Be(expected);
-    // }
-
     [Theory]
-    [InlineData("^WNE$", 1, 3)]
-    [InlineData("^WNE$", 2, 2)]
-    [InlineData("^WNE$", 3, 1)]
-    [InlineData("^W(E)$", 2, 1)]
-    [InlineData("^W(E|)$", 2, 1)]
-    [InlineData("^W(E|)(S|)$", 2, 3)]
-    // [InlineData("^ENWWW(NEEE|SSE(EE|N))$", 5, 11)]
-    // [InlineData("^ENNWSWW(NEWS|)SSSEEN(WNSE|)EE(SWEN|)NNN$", 10, 13)]
-    public void Sanity2(string regex, int shortest, int expected)
+    [InlineData("^NEEE$", 4, 1)]
+    [InlineData("^NN(NN)$", 4, 1)]
+    [InlineData("^NN(NN|)$", 4, 1)]
+    [InlineData("^NN(NN|WW)$", 4, 2)]
+    [InlineData("^NN(NN|WW|)$", 4, 2)]
+    [InlineData("^NN(NN|WW|)$", 2, 3)]
+    [InlineData("^NN(NN|)(EE|)$", 2, 4)]
+    [InlineData("^NN(NN|)E(EE|)$", 2, 4)]
+    [InlineData("^NN(NN|)|EE(EE|)$", 2, 4)]
+    [InlineData("^N(EE|)|E(EEE|)$", 3, 2)]
+    [InlineData("^N(N|)(N|)$", 2, 3)]
+    [InlineData("^N(NN|EE|WW)(NN|EE|SS|WW)$", 4, 12)]
+    [InlineData("^N(NN|EE|WW)(NN|EE|SS|WW|)$", 4, 12)]
+    [InlineData("^N(NN|EE|WW|)(NN|EE|SS|WW|)$", 4, 12)]
+    [InlineData("^N(NN|EE|WW|)(NN|EE|SS|WW|)$", 2, 19)]
+
+    public void Sanity2(string regex, int length, int expected)
     {
         var data = Convert(regex);
 
-        var points = data.DistancesToPoints(Point.Zero, 0);
-        points.GroupToDictionary(it => it.Item1, it => it.Item2).Count(it => it.Value.Min() >= shortest )
-            .Should().Be(expected);
-        
-        data.AtLeast(shortest).Should().Be(expected);
+        var ns = data.Ns();
+        ns.Where(kv => kv.Key >= length).Sum(kv => kv.Value).Should().Be(expected);
     }
 
     [Theory]
@@ -67,24 +65,41 @@ public class Day20
     {
         var data = Convert(AoCLoader.LoadFile(path));
 
-        // var points = data.DistancesToPoints(Point.Zero, 0);
-        // points.GroupBy(it => it.Item1, it => it.Item2).MaxBy(it => it.Min())!.Min()
-            data.Furthest.Should().Be(expected);
+        // data.Furthest.Should().Be(expected);
+        data.Ns().Keys.Max().Should().Be(expected);
+    }
+                             // 
+    [Theory]                 // 1784129105408455694
+    [InlineData("day20", 0)] // 1_784_129_105_408_455_694 too high
+    public void Part2(string path, int expected)
+    {
+        var data = Convert(AoCLoader.LoadFile(path));
+        var x = data.Ns();
+        data.Ns().Where(it => it.Key >= 1000).Sum(it => it.Value)
+            .Should().Be(expected);
     }
 
     public record PathItem(List<Vector> Start, PathChoice Choices)
     {
+        public Dictionary<long, long> Ns() // length of path to count of paths of that length
+        {
+            var mine = new Dictionary<long, long>(); // Enumerable.Range(1, Start.Count).ToDictionary(it =>(long) it, it => 1L);
+            var others = Choices.Ns();
+            if (Start.Count == 0)
+            {
+                return others;
+            }
+            if (Choices.Parts.Count == 0)
+            {
+                return new Dictionary<long, long>() {{Start.Count,1}};
+            }
+            foreach(var (key, value) in others) mine[key + Start.Count] = value;
+            return mine;
+        }
+
         public long Order = Choices.Order == 0 ? 1 : Choices.Order;
         public long Furthest = Start.Count + Choices.Furthest;
 
-        public long AtLeast(int n)
-        {
-            if (n < Start.Count)
-            {
-                return Start.Count - n + Choices.Order;
-            }
-            return Choices.AtLeast(n - Start.Count);
-        }
 
         public PathItem Then(PathChoice grandChildren) => new([], new PathChoice([new PathJoin([this, new([], grandChildren)])]));
         private readonly Dictionary<(Point, long), HashSet<(Point, long)>> tailCache = [];
@@ -132,22 +147,31 @@ public class Day20
 
     public record PathJoin(IReadOnlyList<PathItem> Parts)
     {
-        public long Furthest = Parts.Sum(it => it.Furthest);
-        public long Order = Parts.Select(part => part.Order).Product();
-        internal long AtLeast(int n, int index)
+        public Dictionary<long, long> Ns()
         {
-            if (index >= Parts.Count) return 0;
-            if (n == 0) return Parts.Skip(index).Select(part => part.Order).Product();
-            var part = Parts[index];
-            long result = 0;
-            foreach(var (_, distance) in part.Tails(Point.Zero, 0))
+            return NRs(Parts);
+        }
+
+        private static Dictionary<long, long> NRs(IReadOnlyList<PathItem> pathItems)
+        {
+            if (pathItems.Count == 0) return new Dictionary<long, long>{{0,1}};
+            var mine = pathItems[0].Ns();
+            if (pathItems.Count == 1) return mine;
+            var other = NRs(pathItems.ToList()[1..]);
+            Dictionary<long, long> result = [];
+            // eg: (AB|CD|QP)(EF|GH|XE|WQ)
+            foreach(var (k1, v1) in mine)
             {
-                distance.Should().BeLessThan(int.MaxValue);
-                if (distance >= n) result += (1 + distance - n) * Parts.Skip(index+1).Select(part => part.Order).Product();
-                else result += AtLeast(n-(int)distance, index + 1);
+                foreach(var (k2,v2) in other)
+                {
+                    result[k1 + k2] = result.GetValueOrDefault(k1 + k2) + v1 + v2;
+                }
             }
             return result;
         }
+
+        public long Furthest = Parts.Sum(it => it.Furthest);
+        public long Order = Parts.Select(part => part.Order).Product();
         private readonly Dictionary<(Point, long), HashSet<(Point, long)>> tailCache = [];
         private readonly Dictionary<(Point, long), HashSet<(Point, long)>> distancesCache = [];
         public HashSet<(Point, long)> DistancesToPoints(Point zero, long initial) 
@@ -191,9 +215,15 @@ public class Day20
 
     public record PathChoice(List<PathJoin> Parts)
     {
-        internal long AtLeast(int n)
+        public Dictionary<long, long> Ns()
         {
-            return Parts.Select(part => part.AtLeast(n, 0)).Sum();
+            Dictionary<long, long> mine = [];
+            if (Parts.Count == 0) return [];
+            if (Parts.Last().Parts.Count == 0) return [];
+            foreach(var part in Parts) {
+                foreach(var (key, value) in part.Ns()) mine[key] = mine.GetValueOrDefault(key) + value;
+            }
+            return mine;
         }
         public long Furthest => Parts.Count == 0 ? 0 : Parts.Last().Parts.Count == 0 ? 0 : Parts.Max(part => part.Furthest);
         public long Order = Parts.Select(part => part.Order).Sum();
@@ -228,7 +258,6 @@ public class Day20
             return result;
         }
 
-    
   }
 
     private static PathChoice Convert(string data)
