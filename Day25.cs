@@ -44,24 +44,22 @@ public class Day25
   {
     var points = Convert(AoCLoader.LoadLines(path));
 
-    List<List<int>> threes = [];
+    List<List<int>> constellations = [];
     foreach(var p1 in points)
     {
-      threes.Add([]);
+      constellations.Add([]);
       foreach(var (p2, index) in points.Select((p2,index) => (p2,index))) {
-        if (p1.ManhattanDistance(p2) <= 3) threes[^1].Add(index);
+        if (p1.ManhattanDistance(p2) <= 3) constellations[^1].Add(index);
       }
     }
 
-    List<HashSet<int>> constellations = [];
     foreach(var p1 in Enumerable.Range(0, points.Count))
     {
       // cIndices is a list of the indices of the constellations containing point p1.
       var cIndices = constellations.Select((c, index) => (c, index)).Where(c => c.c.Contains(p1)).Select(c => c.index).ToList();
       cIndices.Reverse(); // reversed so they can be removed from the list without disturbing later indices
-      var s = new HashSet<int>(threes[p1]);
+      var s = constellations.SelectMany(it => it).Distinct().ToList();
       foreach(var cIndex in cIndices) {
-        s.UnionWith(constellations[cIndex]);
         constellations.RemoveAt(cIndex);
       }
       constellations.Add(s);
