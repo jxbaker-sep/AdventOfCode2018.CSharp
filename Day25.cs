@@ -55,14 +55,12 @@ public class Day25
 
     foreach(var p1 in Enumerable.Range(0, points.Count))
     {
-      // cIndices is a list of the indices of the constellations containing point p1.
-      var cIndices = constellations.Select((c, index) => (c, index)).Where(c => c.c.Contains(p1)).Select(c => c.index).ToList();
-      cIndices.Reverse(); // reversed so they can be removed from the list without disturbing later indices
-      var s = constellations.SelectMany(it => it).Distinct().ToList();
-      foreach(var cIndex in cIndices) {
+      var constellationsContainingP1 = constellations.Select((c, index) => (c, index)).Where(c => c.c.Contains(p1));
+      var newConstellation = constellationsContainingP1.SelectMany(it => it.c).Distinct().ToList();
+      foreach(var cIndex in constellationsContainingP1.Select(it => it.index).Reverse()) {
         constellations.RemoveAt(cIndex);
       }
-      constellations.Add(s);
+      constellations.Add(newConstellation);
     }
 
     constellations.Count.Should().Be(expected);
