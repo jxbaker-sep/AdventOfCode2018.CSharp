@@ -1,4 +1,3 @@
-using System.Data.SqlTypes;
 using AdventOfCode2018.CSharp.Utils;
 using FluentAssertions;
 using Parser;
@@ -8,7 +7,6 @@ namespace AdventOfCode2018.CSharp;
 
 public class Day25
 {
-
   [Theory]
   [InlineData("Day25.Sample.1", 2)]
   [InlineData("Day25.Sample.2", 4)]
@@ -34,6 +32,78 @@ public class Day25
     }
 
     closed.Select(it => it.Item2.Find()).Distinct().Count().Should().Be(expected);
+  }
+
+  [Theory]
+  [InlineData("Day25.Sample.1", 2)]
+  [InlineData("Day25.Sample.2", 4)]
+  [InlineData("Day25.Sample.3", 3)]
+  [InlineData("Day25.Sample.4", 8)]
+  [InlineData("Day25", 383)]
+  public void Part1_Without_DS(string path, int expected)
+  {
+    var points = Convert(AoCLoader.LoadLines(path));
+
+    List<List<int>> threes = [];
+    foreach(var p1 in points)
+    {
+      threes.Add([]);
+      foreach(var (p2, index) in points.Select((p2,index) => (p2,index))) {
+        if (p1.ManhattanDistance(p2) <= 3) threes[^1].Add(index);
+      }
+    }
+
+    List<HashSet<int>> constellations = [];
+    foreach(var p1 in Enumerable.Range(0, points.Count))
+    {
+      // cIndices is a list of the indices of the constellations containing point p1.
+      var cIndices = constellations.Select((c, index) => (c, index)).Where(c => c.c.Contains(p1)).Select(c => c.index).ToList();
+      cIndices.Reverse(); // reversed so they can be removed from the list without disturbing later indices
+      var s = new HashSet<int>(threes[p1]);
+      foreach(var cIndex in cIndices) {
+        s.UnionWith(constellations[cIndex]);
+        constellations.RemoveAt(cIndex);
+      }
+      constellations.Add(s);
+    }
+
+    constellations.Count.Should().Be(expected);
+  }
+
+  [Theory]
+  [InlineData("Day25.Sample.1", 2)]
+  [InlineData("Day25.Sample.2", 4)]
+  [InlineData("Day25.Sample.3", 3)]
+  [InlineData("Day25.Sample.4", 8)]
+  [InlineData("Day25", 383)]
+  public void Part1_ViaProjection(string path, int expected)
+  {
+    var points = Convert(AoCLoader.LoadLines(path)).ToHashSet();
+
+    Dictionary<Point4, DisjointSet> grid = points.ToDictionary(it => it, _ => new DisjointSet());
+    foreach(var point in points)
+    {
+      var ds = grid[point];
+      foreach(var next in Open(point).Where(next => points.Contains(next)))
+      {
+        ds.Union(grid[next]);
+      }
+    }
+
+    grid.Values.Select(it => it.Find()).Distinct().Count().Should().Be(expected);
+  }
+
+  public static IEnumerable<Point4> Open(Point4 point)
+  {
+    foreach(var dx in Enumerable.Range(-3, 7))
+    foreach(var dy in Enumerable.Range(-3, 7))
+    foreach(var dz in Enumerable.Range(-3, 7))
+    foreach(var dt in Enumerable.Range(-3, 7))
+    {
+      if (dx == 0 && dy == 0 && dz == 0 && dt == 0) continue;
+      var next = new Point4(point.X + dx, point.Y + dy, point.Z + dz, point.T + dt);
+      if (next.ManhattanDistance(point) <= 3) yield return next;
+    }
   }
 
   public record Point4(long X, long Y, long Z, long T)
