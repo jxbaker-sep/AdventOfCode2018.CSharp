@@ -11,4 +11,9 @@ public static class LinkedListExtensions
       current = current.Next;
     }
   }
+
+  public static LinkedList<T> ToLinkedList<T>(this IEnumerable<T> self)
+  {
+    return new LinkedList<T>(self);
+  }
 }

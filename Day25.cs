@@ -44,23 +44,29 @@ public class Day25
   {
     var points = Convert(AoCLoader.LoadLines(path));
 
-    List<List<int>> constellations = [];
-    foreach(var p1 in points)
-    {
-      constellations.Add([]);
-      foreach(var (p2, index) in points.Select((p2,index) => (p2,index))) {
-        if (p1.ManhattanDistance(p2) <= 3) constellations[^1].Add(index);
-      }
-    }
+    var constellations = points.Select(p1 => points.Select((p2,index) => (md: p2.ManhattanDistance(p1),index))
+                                                   .Where(it => it.md <= 3)
+                                                   .Select(it => it.index).ToHashSet())
+                               .ToLinkedList();
 
     foreach(var p1 in Enumerable.Range(0, points.Count))
     {
-      var constellationsContainingP1 = constellations.Select((c, index) => (c, index)).Where(c => c.c.Contains(p1));
-      var newConstellation = constellationsContainingP1.SelectMany(it => it.c).Distinct().ToList();
-      foreach(var cIndex in constellationsContainingP1.Select(it => it.index).Reverse()) {
-        constellations.RemoveAt(cIndex);
+      HashSet<int>? found = null;
+      var current = constellations.First;
+      while (current != null)
+      {
+        var next = current.Next;
+        if (current.Value.Contains(p1)) {
+          if (found == null) {
+            found = current.Value;
+          }
+          else {
+            found.UnionWith(current.Value);
+            constellations.Remove(current);
+          }
+        }
+        current = next;
       }
-      constellations.Add(newConstellation);
     }
 
     constellations.Count.Should().Be(expected);
