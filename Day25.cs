@@ -5,6 +5,22 @@ using P = Parser.ParserBuiltins;
 
 namespace AdventOfCode2018.CSharp;
 
+// I have solved this day using 5 algorithms:
+// DisjointSets (fastest)
+//    create a DisjointSet for each point, then join that DS to each previous created DS that's within 3 of it.
+//    (two variants; one creates the DS in the loop, the second creates the DS for each point first.)
+// Without_DS
+//    First, create a linked list of constellations. Initially populate with everything within 3 of each other.
+//    Then, for each point, find all the constellations containing that point; union them all into a single
+//    constellation, and remove the other constellations
+// Via Projection:
+//    Foreach point, look at every one within 3 of that, and union them together. 
+// Via Coloring:
+//    Graph coloring: walk each constellation, coloring it. And the end, the number of distinct colors in the number of constellations.
+//    (Removes colored points as it goes.)
+// Via Flood Fill Of Neighbors:
+//    Similar to above, except keeps track of the color of each node.
+
 public class Day25
 {
   [Theory]
@@ -13,7 +29,7 @@ public class Day25
   [InlineData("Day25.Sample.3", 3)]
   [InlineData("Day25.Sample.4", 8)]
   [InlineData("Day25", 383)]
-  public void Part1(string path, int expected)
+  public void Part1_DS(string path, int expected)
   {
     var points = Convert(AoCLoader.LoadLines(path));
 
@@ -26,6 +42,32 @@ public class Day25
         if (key.ManhattanDistance(point) <= 3)
         {
           value.Union(ds);
+        }
+      }
+      closed.Add((point, ds));
+    }
+
+    closed.Select(it => it.Item2.Find()).Distinct().Count().Should().Be(expected);
+  }
+
+  [Theory]
+  [InlineData("Day25.Sample.1", 2)]
+  [InlineData("Day25.Sample.2", 4)]
+  [InlineData("Day25.Sample.3", 3)]
+  [InlineData("Day25.Sample.4", 8)]
+  [InlineData("Day25", 383)]
+  public void Part1_DS2(string path, int expected)
+  {
+    var points = Convert(AoCLoader.LoadLines(path)).Select(it => (it, new DisjointSet()));
+
+    List<(Point4, DisjointSet)> closed = [];
+    foreach(var (point, ds) in points)
+    {
+      foreach(var (point2, ds2) in closed)
+      {
+        if (point2.ManhattanDistance(point) <= 3)
+        {
+          ds2.Union(ds);
         }
       }
       closed.Add((point, ds));
@@ -93,6 +135,108 @@ public class Day25
     }
 
     grid.Values.Select(it => it.Find()).Distinct().Count().Should().Be(expected);
+  }
+
+  [Theory]
+  [InlineData("Day25.Sample.1", 2)]
+  [InlineData("Day25.Sample.2", 4)]
+  [InlineData("Day25.Sample.3", 3)]
+  [InlineData("Day25.Sample.4", 8)]
+  [InlineData("Day25", 383)]
+  public void Part1_ViaColoring(string path, int expected)
+  {
+    var points = Convert(AoCLoader.LoadLines(path)).ToHashSet();
+
+    var constellationCount = 0;
+    while(points.Count > 0)
+    {
+      constellationCount += 1;
+      var first = points.First();
+      points.Remove(first);
+      Queue<Point4> open = [];
+      open.Enqueue(first);
+      while (open.TryDequeue(out var current))
+      {
+        foreach(var p4 in Open(current))
+        {
+          if (points.Remove(p4))
+          {
+            open.Enqueue(p4);
+          }
+        }
+      }
+    }
+
+    constellationCount.Should().Be(expected);
+  }
+
+  [Theory]
+  [InlineData("Day25.Sample.1", 2)]
+  [InlineData("Day25.Sample.2", 4)]
+  [InlineData("Day25.Sample.3", 3)]
+  [InlineData("Day25.Sample.4", 8)]
+  [InlineData("Day25", 383)]
+  public void Part1_ViaFloodFillOfNeighbors(string path, int expected)
+  {
+    var points = Convert(AoCLoader.LoadLines(path)).ToHashSet();
+    var neighbors = points.ToDictionary(it => it, it => points.Where(it2 => it != it2 && it.ManhattanDistance(it2) <= 3).ToList());
+    var colors = points.ToDictionary(it => it, _ => 0);
+
+    var current = 0;
+
+    foreach(var point in points)
+    {
+      if (colors[point] > 0) continue;
+      current += 1;
+      colors[point] = current;
+      Queue<Point4> open = [];
+      open.Enqueue(point);
+      while (open.TryDequeue(out var next))
+      {
+        foreach(var neighbor in neighbors[next])
+        {
+          if (colors[neighbor] > 0) continue;
+          colors[neighbor] = current;
+          open.Enqueue(neighbor);
+        }
+      }
+    }
+
+    current.Should().Be(expected);
+  }
+
+  [Theory]
+  [InlineData("Day25.Sample.1", 2)]
+  [InlineData("Day25.Sample.2", 4)]
+  [InlineData("Day25.Sample.3", 3)]
+  [InlineData("Day25.Sample.4", 8)]
+  [InlineData("Day25", 383)]
+  public void Part1_ViaFloodFillOfNeighborsUsingRecursion(string path, int expected)
+  {
+    var points = Convert(AoCLoader.LoadLines(path)).ToHashSet();
+    var neighbors = points.ToDictionary(it => it, it => points.Where(it2 => it != it2 && it.ManhattanDistance(it2) <= 3).ToList());
+    var colors = points.ToDictionary(it => it, _ => 0);
+
+    var color = 0;
+
+    foreach(var point in points)
+    {
+      if (colors[point] > 0) continue;
+      color += 1;
+      FloodFill(color, point, neighbors, colors);
+    }
+
+    color.Should().Be(expected);
+  }
+
+  private static void FloodFill(int color, Point4 point, Dictionary<Point4, List<Point4>> neighbors, Dictionary<Point4, int> colors)
+  {
+    if (colors[point] > 0) return;
+    colors[point] = color;
+    foreach(var neighbor in neighbors[point])
+    {
+      FloodFill(color, neighbor, neighbors, colors);
+    }
   }
 
   public static IEnumerable<Point4> Open(Point4 point)
