@@ -2,8 +2,12 @@ namespace AdventOfCode2018.CSharp.Utils;
 
 public static class MiscUtils
 {
-  public static IEnumerable<long> InclusiveRange(long start, long stop) {
+  public static IEnumerable<long> InclusiveRangeLong(long start, long stop) {
     for(long i = start; i <= stop; i++) yield return i;
+  }
+
+  public static IEnumerable<int> InclusiveRangeInt(int start, int stop) {
+    for(int i = start; i <= stop; i++) yield return i;
   }
 
   public static int? BinarySearch(int maxValue, Func<int, bool> action) {

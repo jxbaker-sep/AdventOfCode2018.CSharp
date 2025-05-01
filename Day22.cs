@@ -18,8 +18,8 @@ public class Day22
   {
     var cave = Convert(AoCLoader.LoadFile(path));
 
-    MiscUtils.InclusiveRange(0, cave.Target.X)
-        .SelectMany(x => MiscUtils.InclusiveRange(0, cave.Target.Y).Select(y => new Point(y, x)))
+    MiscUtils.InclusiveRangeLong(0, cave.Target.X)
+        .SelectMany(x => MiscUtils.InclusiveRangeLong(0, cave.Target.Y).Select(y => new Point(y, x)))
         .Sum(point => RiskLevel(point, cave))
         .Should().Be(expected);
   }

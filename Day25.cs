@@ -229,6 +229,35 @@ public class Day25
     color.Should().Be(expected);
   }
 
+  [Theory]
+  [InlineData("Day25.Sample.1", 2)]
+  [InlineData("Day25.Sample.2", 4)]
+  [InlineData("Day25.Sample.3", 3)]
+  [InlineData("Day25.Sample.4", 8)]
+  [InlineData("Day25", 383)]
+  public void ViaSetUnions(string path, int expected)
+  {
+    var points = Convert(AoCLoader.LoadLines(path));
+    List<HashSet<int>> sets = points.Select((_, index) => new HashSet<int>{index}).ToList();
+
+    foreach(var i in Enumerable.Range(0, points.Count) )
+    {
+      var adjacents = Enumerable.Range(0, points.Count).Where(j => points[i].ManhattanDistance(points[j]) <= 3).ToList();
+      var min = adjacents.Select(it => sets[it].Min()).Min();
+      var chosen = sets[min];
+      foreach(var next in adjacents) {
+        if (sets[next] != chosen) {
+          chosen.UnionWith(sets[next]);
+        }
+      }
+      foreach(var next in chosen) {
+        sets[next] = chosen;
+      }
+    }
+
+    sets.Distinct().Count().Should().Be(expected);
+  }
+
   private static void FloodFill(int color, Point4 point, Dictionary<Point4, List<Point4>> neighbors, Dictionary<Point4, int> colors)
   {
     if (colors[point] > 0) return;
