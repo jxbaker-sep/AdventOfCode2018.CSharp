@@ -243,15 +243,9 @@ public class Day25
     foreach(var i in Enumerable.Range(0, points.Count) )
     {
       var adjacents = Enumerable.Range(0, points.Count).Where(j => points[i].ManhattanDistance(points[j]) <= 3).ToList();
-      var min = adjacents.Select(it => sets[it].Min()).Min();
-      var chosen = sets[min];
-      foreach(var next in adjacents) {
-        if (sets[next] != chosen) {
-          chosen.UnionWith(sets[next]);
-        }
-      }
-      foreach(var next in chosen) {
-        sets[next] = chosen;
+      var newConstellation = adjacents.SelectMany(it => sets[it]).ToHashSet();
+      foreach(var next in newConstellation) {
+        sets[next] = newConstellation;
       }
     }
 
