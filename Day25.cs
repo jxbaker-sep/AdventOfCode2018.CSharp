@@ -261,22 +261,19 @@ public class Day25
   public void ViaSetGraph(string path, int expected)
   {
     var points = Convert(AoCLoader.LoadLines(path));
-    Dictionary<Point4, GraphNode> nodes = [];
-    foreach(var point in points)
+    List<GraphNode> nodes = points.Select(_ => new GraphNode()).ToList();
+    foreach(var point in Enumerable.Range(0, points.Count))
     {
-      var mynode = nodes.TryGetValue(point, out var temp) ? temp : new GraphNode();
-      nodes[point] = mynode;
-      var neighbors = points.Where(p2 => p2 != point).Where(p2 => point.ManhattanDistance(p2) <= 3).ToList();
+      var mynode = nodes[point];
+      var neighbors = Enumerable.Range(0, points.Count).Where(p2 => p2 != point).Where(p2 => points[point].ManhattanDistance(points[p2]) <= 3).ToList();
       foreach(var neighbor in neighbors)
       {
-        var neighborNode = nodes.TryGetValue(neighbor, out var temp2) ? temp2 : new GraphNode();
-        nodes[neighbor] = neighborNode;
-        mynode.Connections.Add(neighborNode);
+        mynode.Connections.Add(nodes[neighbor]);
       }
     }
 
     var nextColor = 1;
-    foreach(var node in nodes.Values)
+    foreach(var node in nodes)
     {
       if (node.Color > 0) continue;
       var currentColor = nextColor++;
