@@ -252,6 +252,53 @@ public class Day25
     sets.Distinct().Count().Should().Be(expected);
   }
 
+  [Theory]
+  [InlineData("Day25.Sample.1", 2)]
+  [InlineData("Day25.Sample.2", 4)]
+  [InlineData("Day25.Sample.3", 3)]
+  [InlineData("Day25.Sample.4", 8)]
+  [InlineData("Day25", 383)]
+  public void ViaSetGraph(string path, int expected)
+  {
+    var points = Convert(AoCLoader.LoadLines(path));
+    Dictionary<Point4, GraphNode> nodes = [];
+    foreach(var point in points)
+    {
+      var mynode = nodes.TryGetValue(point, out var temp) ? temp : new GraphNode();
+      nodes[point] = mynode;
+      var neighbors = points.Where(p2 => p2 != point).Where(p2 => point.ManhattanDistance(p2) <= 3).ToList();
+      foreach(var neighbor in neighbors)
+      {
+        var neighborNode = nodes.TryGetValue(neighbor, out var temp2) ? temp2 : new GraphNode();
+        nodes[neighbor] = neighborNode;
+        mynode.Connections.Add(neighborNode);
+      }
+    }
+
+    var nextColor = 1;
+    foreach(var node in nodes.Values)
+    {
+      if (node.Color > 0) continue;
+      var currentColor = nextColor++;
+      Queue<GraphNode> q = [];
+      q.Enqueue(node);
+      while (q.TryDequeue(out var next))
+      {
+        if (next.Color > 0) continue;
+        next.Color = currentColor;
+        foreach(var n2 in next.Connections) q.Enqueue(n2);
+      }
+    }
+
+    (nextColor-1).Should().Be(expected);
+  }
+
+  public class GraphNode
+  {
+    public int Color = 0;
+    public List<GraphNode> Connections = [];
+  }
+
   private static void FloodFill(int color, Point4 point, Dictionary<Point4, List<Point4>> neighbors, Dictionary<Point4, int> colors)
   {
     if (colors[point] > 0) return;
