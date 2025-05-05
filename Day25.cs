@@ -264,11 +264,13 @@ public class Day25
     List<GraphNode> nodes = points.Select(_ => new GraphNode()).ToList();
     foreach(var point in Enumerable.Range(0, points.Count))
     {
-      var mynode = nodes[point];
-      var neighbors = Enumerable.Range(0, points.Count).Where(p2 => p2 != point).Where(p2 => points[point].ManhattanDistance(points[p2]) <= 3).ToList();
-      foreach(var neighbor in neighbors)
+      foreach(var neighbor in MiscUtils.InclusiveRangeInt(point+1, points.Count-1))
       {
-        mynode.Connections.Add(nodes[neighbor]);
+        if (points[point].ManhattanDistance(points[neighbor]) > 3) continue;
+        var mynode = nodes[point];
+        var neighbornode = nodes[neighbor];
+        mynode.Connections.Add(neighbornode);
+        neighbornode.Connections.Add(mynode);
       }
     }
 
