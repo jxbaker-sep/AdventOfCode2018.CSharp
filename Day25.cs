@@ -239,18 +239,18 @@ public class Day25
   public void ViaSetUnions(string path, int expected)
   {
     var points = Convert(AoCLoader.LoadLines(path));
-    List<HashSet<int>> sets = points.Select((_, index) => new HashSet<int>{index}).ToList();
+    List<HashSet<int>> neighbors = Neighbors(points).Select((it, index) => it.Append(index).ToHashSet()).ToList();
+    var constellations = neighbors.Select(it => it.ToHashSet()).ToList();
 
     foreach(var i in Enumerable.Range(0, points.Count) )
     {
-      var adjacents = Enumerable.Range(0, points.Count).Where(j => points[i].ManhattanDistance(points[j]) <= 3).ToList();
-      var newConstellation = adjacents.SelectMany(it => sets[it]).ToHashSet();
+      var newConstellation = neighbors[i].SelectMany(it => constellations[it]).ToHashSet();
       foreach(var next in newConstellation) {
-        sets[next] = newConstellation;
+        constellations[next] = newConstellation;
       }
     }
 
-    sets.Distinct().Count().Should().Be(expected);
+    constellations.Distinct().Count().Should().Be(expected);
   }
 
   [Theory]
