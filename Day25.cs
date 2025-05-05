@@ -1,5 +1,6 @@
 using AdventOfCode2018.CSharp.Utils;
 using FluentAssertions;
+using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 using Parser;
 using P = Parser.ParserBuiltins;
 
@@ -261,35 +262,40 @@ public class Day25
   public void ViaSetGraph(string path, int expected)
   {
     var points = Convert(AoCLoader.LoadLines(path));
-    List<GraphNode> nodes = points.Select(_ => new GraphNode()).ToList();
-    foreach(var point in Enumerable.Range(0, points.Count))
-    {
-      foreach(var neighbor in MiscUtils.InclusiveRangeInt(point+1, points.Count-1))
-      {
-        if (points[point].ManhattanDistance(points[neighbor]) > 3) continue;
-        var mynode = nodes[point];
-        var neighbornode = nodes[neighbor];
-        mynode.Connections.Add(neighbornode);
-        neighbornode.Connections.Add(mynode);
-      }
-    }
+    var neighbors = Neighbors(points);
+    var colors = points.Select(_ => 0).ToList();
 
     var nextColor = 1;
-    foreach(var node in nodes)
+    foreach(var node in Enumerable.Range(0, points.Count))
     {
-      if (node.Color > 0) continue;
+      if (colors[node] > 0) continue;
       var currentColor = nextColor++;
-      Queue<GraphNode> q = [];
+      Queue<int> q = [];
       q.Enqueue(node);
       while (q.TryDequeue(out var next))
       {
-        if (next.Color > 0) continue;
-        next.Color = currentColor;
-        foreach(var n2 in next.Connections) q.Enqueue(n2);
+        if (colors[next] > 0) continue;
+        colors[next] = currentColor;
+        foreach(var n2 in neighbors[next]) q.Enqueue(n2);
       }
     }
 
     (nextColor-1).Should().Be(expected);
+  }
+
+  public static List<List<int>> Neighbors(List<Point4> points)
+  {
+    var result = points.Select(_ => new List<int>()).ToList();
+    foreach(var p1 in Enumerable.Range(0, points.Count))
+    {
+      foreach(var p2 in MiscUtils.InclusiveRangeInt(p1+1, points.Count-1))
+      {
+        if (points[p1].ManhattanDistance(points[p2]) > 3) continue;
+        result[p1].Add(p2);
+        result[p2].Add(p1);
+      }
+    }
+    return result;
   }
 
   public class GraphNode
